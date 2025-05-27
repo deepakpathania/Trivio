@@ -68,7 +68,7 @@ export default function Quiz() {
         } else {
           navigate(`/result?score=${score + (isCorrect ? 1 : 0)}`);
         }
-      }, 300);
+      }, 600);
     },
     [currentIndex, questions, score, navigate]
   );
