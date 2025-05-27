@@ -180,3 +180,10 @@ body {
 .option {
   color: #0f0;
 }
+
+/* Apply to question text and buttons/options */
+.text-wrap {
+  white-space: normal;          /* allow wrapping */
+  word-break: normal;           /* don’t break inside words */
+  overflow-wrap: break-word;    /* wrap long words only at word boundaries */
+}

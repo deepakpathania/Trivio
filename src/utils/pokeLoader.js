@@ -18,7 +18,7 @@ async function fetchPokemon(id) {
   }
   
   // generate one quiz question
-  async function generatePokemonQuestion() {
+export async function generatePokemonQuestion() {
     // pick 4 distinct pokemon
     const ids = getRandomIds(4);
     const pokemons = await Promise.all(ids.map(fetchPokemon));

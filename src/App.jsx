@@ -18,7 +18,7 @@ export default function App() {
                   <Link
                     key={cat.key}
                     to={cat.enabled ? `/quiz/${cat.key}` : "#"}
-                    className={`btn category-btn ${
+                    className={`btn category-btn text-wrap ${
                       !cat.enabled ? "disabled" : ""
                     }`}
                     onClick={(e) => !cat.enabled && e.preventDefault()}

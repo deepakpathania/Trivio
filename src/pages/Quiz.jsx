@@ -1,20 +1,20 @@
-// src/pages/Quiz.jsx
 import React, { useEffect, useState, useRef, useCallback, memo } from "react";
 import { useParams, useNavigate } from "react-router-dom";
-import { loadPokemonQuestions } from "../utils/pokeLoader";
+import PropTypes from "prop-types";
 import { loadBigOQuestions } from "../utils/dataLoader";
+import { createPokePaginator } from "../utils/pokePaginator";
 import { CATEGORIES } from "../constants/categories";
 
 // Memoized question display component
 const QuestionDisplay = memo(({ q, onAnswer, selected, answerIndex }) => (
   <>
-    {q.question && <p className="question-text">{q.question}</p>}
+    {q.question && <p className="question-text text-wrap">{q.question}</p>}
     {q.image && <img src={q.image} alt="quiz" className="question-image" />}
     <div className="options">
       {q.options.map((opt, i) => (
         <button
           key={i}
-          className={`btn option ${
+          className={`btn option text-wrap ${
             selected !== null
               ? i === answerIndex
                 ? "correct"
@@ -44,7 +44,11 @@ export default function Quiz() {
   const [timeLeft, setTimeLeft] = useState(15);
   const timerRef = useRef(null);
 
-  // Shuffle helper
+  const isPokemon = categoryKey === "pokemon";
+  const TOTAL = 10;
+  const paginatorRef = useRef(null);
+
+  // shuffle helper
   const shuffle = useCallback((arr) => {
     const a = [...arr];
     for (let i = a.length - 1; i > 0; i--) {
@@ -54,33 +58,21 @@ export default function Quiz() {
     return a;
   }, []);
 
-  // Answer handler
-  const handleAnswer = useCallback(
-    (index) => {
-      clearInterval(timerRef.current);
-      setSelected(index);
-      const isCorrect = index === questions[currentIndex].answerIndex;
-      if (isCorrect) setScore((s) => s + 1);
-      setTimeout(() => {
-        const nextIndex = currentIndex + 1;
-        if (nextIndex < questions.length) {
-          setCurrentIndex(nextIndex);
-        } else {
-          navigate(`/result?score=${score + (isCorrect ? 1 : 0)}`);
-        }
-      }, 600);
-    },
-    [currentIndex, questions, score, navigate]
-  );
-
-  // Load questions once and preload images
+  // initialize quiz and background fetch for Pokemon
   useEffect(() => {
-    let isMounted = true;
+    let mounted = true;
     async function init() {
-      if (categoryKey === "pokemon") {
-        const qs = await loadPokemonQuestions(10);
+      if (isPokemon) {
+        const paginator = createPokePaginator(TOTAL, 3);
+        paginatorRef.current = paginator;
+
+        // Fetch initial chunk
+        await paginator.init();
+        let buffer = paginator.buffer;
+        const initial = buffer.slice(0, 3);
+        // preload initial images
         await Promise.all(
-          qs.map((q) =>
+          initial.map((q) =>
             q.image
               ? new Promise((r) => {
                   const img = new Image();
@@ -90,42 +82,87 @@ export default function Quiz() {
               : Promise.resolve()
           )
         );
-        if (isMounted) {
-          setQuestions(qs);
-          setCurrentIndex(0);
-        }
+        if (!mounted) return;
+        setQuestions(initial);
+
+        // Background fetch remaining chunks
+        (async () => {
+          while (mounted && buffer.length < TOTAL) {
+            await paginator.init(); // fetch next chunk
+            buffer = paginator.buffer;
+            const sliceEnd = Math.min(buffer.length, TOTAL);
+            const newItems = buffer.slice(questions.length, sliceEnd);
+            // preload new items
+            await Promise.all(
+              newItems.map((q) =>
+                q.image
+                  ? new Promise((r) => {
+                      const img = new Image();
+                      img.src = q.image;
+                      img.onload = img.onerror = r;
+                    })
+                  : Promise.resolve()
+              )
+            );
+            if (!mounted) break;
+            setQuestions(buffer.slice(0, sliceEnd));
+          }
+        })();
       } else {
         const all = await loadBigOQuestions();
-        if (isMounted) {
-          setQuestions(shuffle(all).slice(0, 10));
-          setCurrentIndex(0);
-        }
+        const picked = shuffle(all).slice(0, TOTAL);
+        if (!mounted) return;
+        setQuestions(picked);
       }
+      setCurrentIndex(0);
+      setScore(0);
+      setSelected(null);
+      setTimeLeft(15);
     }
     init();
     return () => {
-      isMounted = false;
+      mounted = false;
+      clearInterval(timerRef.current);
     };
-  }, [categoryKey, shuffle]);
+  }, [categoryKey, isPokemon, shuffle]);
 
-  // Handle question change: reset timer and selected
+  // timer per question
   useEffect(() => {
     if (!questions.length) return;
-    setSelected(null);
-    setTimeLeft(15);
     clearInterval(timerRef.current);
+    setTimeLeft(15);
     timerRef.current = setInterval(() => {
-      setTimeLeft((prev) => (prev > 0 ? prev - 1 : 0));
+      setTimeLeft((t) => {
+        if (t <= 1) {
+          clearInterval(timerRef.current);
+          handleAnswer(null);
+          return 0;
+        }
+        return t - 1;
+      });
     }, 1000);
     return () => clearInterval(timerRef.current);
   }, [questions, currentIndex]);
 
-  // Auto-advance on timeout
-  useEffect(() => {
-    if (timeLeft === 0 && selected === null) {
-      handleAnswer(null);
-    }
-  }, [timeLeft, selected, handleAnswer]);
+  const handleAnswer = useCallback(
+    (idx) => {
+      clearInterval(timerRef.current);
+      setSelected(idx);
+      const q = questions[currentIndex];
+      const correct = idx === q.answerIndex;
+      if (correct) setScore((s) => s + 1);
+      setTimeout(() => {
+        const next = currentIndex + 1;
+        if (next < TOTAL && next < questions.length) {
+          setCurrentIndex(next);
+          setSelected(null);
+        } else {
+          navigate(`/result?score=${score + (correct ? 1 : 0)}`);
+        }
+      }, 600);
+    },
+    [currentIndex, questions, score, navigate]
+  );
 
   if (!questions.length)
     return <div className="loading-screen">Loading Quiz...</div>;
@@ -136,7 +173,7 @@ export default function Quiz() {
     <div className="quiz-container">
       <h2>{CATEGORIES.find((c) => c.key === categoryKey)?.label} Quiz</h2>
       <div className="progress">
-        Question {currentIndex + 1} / {questions.length}
+        Question {currentIndex + 1} / {TOTAL}
       </div>
       <div className="timer">Time Left: {timeLeft}s</div>
       <QuestionDisplay
@@ -148,3 +185,7 @@ export default function Quiz() {
     </div>
   );
 }
+
+Quiz.propTypes = {
+  onComplete: PropTypes.func,
+};
