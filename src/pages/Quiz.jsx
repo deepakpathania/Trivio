@@ -5,13 +5,27 @@ import { loadBigOQuestions } from "../utils/dataLoader";
 import { createPokePaginator } from "../utils/pokePaginator";
 import { CATEGORIES } from "../constants/categories";
 
-// Memoized question display component
-const QuestionDisplay = memo(({ q, onAnswer, selected, answerIndex }) => (
-  <>
-    {q.question && <p className="question-text text-wrap">{q.question}</p>}
-    {q.image && <img src={q.image} alt="quiz" className="question-image" />}
+// Constants
+const TOTAL_QUESTIONS = 10;
+const POKEMON_CATEGORY = "pokemon";
+
+// Utility to shuffle arrays
+const shuffle = (arr) => {
+  const a = [...arr];
+  for (let i = a.length - 1; i > 0; i--) {
+    const j = Math.floor(Math.random() * (i + 1));
+    [a[i], a[j]] = [a[j], a[i]];
+  }
+  return a;
+};
+
+// Component to display a question
+const QuestionDisplay = memo(({ question, onAnswer, selected, answerIndex }) => (
+  <div className="question-block">
+    {question.question && <p className="question-text text-wrap">{question.question}</p>}
+    {question.image && <img src={question.image} alt="quiz" className="question-image" />}
     <div className="options">
-      {q.options.map((opt, i) => (
+      {question.options.map((opt, i) => (
         <button
           key={i}
           className={`btn option text-wrap ${
@@ -30,103 +44,82 @@ const QuestionDisplay = memo(({ q, onAnswer, selected, answerIndex }) => (
         </button>
       ))}
     </div>
-  </>
+  </div>
 ));
 
-export default function Quiz() {
+export default function Quiz({ onComplete }) {
   const { categoryKey } = useParams();
   const navigate = useNavigate();
 
   const [questions, setQuestions] = useState([]);
   const [currentIndex, setCurrentIndex] = useState(0);
-  const [score, setScore] = useState(0);
   const [selected, setSelected] = useState(null);
+  const [score, setScore] = useState(0);
   const [timeLeft, setTimeLeft] = useState(15);
+  const [muted, setMuted] = useState(false);
+
   const timerRef = useRef(null);
-
-  const isPokemon = categoryKey === "pokemon";
-  const TOTAL = 10;
   const paginatorRef = useRef(null);
+  const themeAudioRef = useRef(null);
 
-  // shuffle helper
-  const shuffle = useCallback((arr) => {
-    const a = [...arr];
-    for (let i = a.length - 1; i > 0; i--) {
-      const j = Math.floor(Math.random() * (i + 1));
-      [a[i], a[j]] = [a[j], a[i]];
-    }
-    return a;
-  }, []);
+  const isPokemon = categoryKey === POKEMON_CATEGORY;
 
-  // initialize quiz and background fetch for Pokemon
+  // Mute control
+  const toggleMute = () => setMuted((m) => !m);
+
+  // Play theme audio on mount
   useEffect(() => {
-    let mounted = true;
-    async function init() {
+    if (isPokemon) {
+      const audio = new Audio("/Trivio/pokemon-theme.mp3");
+      audio.loop = true;
+      audio.muted = muted;
+      audio.play().catch(() => {});
+      themeAudioRef.current = audio;
+      return () => {
+        audio.pause();
+      };
+    }
+  }, [isPokemon]);
+
+  // Sync mute state
+  useEffect(() => {
+    if (themeAudioRef.current) themeAudioRef.current.muted = muted;
+  }, [muted]);
+
+  // Initial load and basic chunk logic
+  useEffect(() => {
+    let active = true;
+    const load = async () => {
       if (isPokemon) {
-        const paginator = createPokePaginator(TOTAL, 3);
-        paginatorRef.current = paginator;
-
-        // Fetch initial chunk
-        await paginator.init();
-        let buffer = paginator.buffer;
-        const initial = buffer.slice(0, 3);
-        // preload initial images
-        await Promise.all(
-          initial.map((q) =>
-            q.image
-              ? new Promise((r) => {
-                  const img = new Image();
-                  img.src = q.image;
-                  img.onload = img.onerror = r;
-                })
-              : Promise.resolve()
-          )
-        );
-        if (!mounted) return;
-        setQuestions(initial);
-
-        // Background fetch remaining chunks
-        (async () => {
-          while (mounted && buffer.length < TOTAL) {
-            await paginator.init(); // fetch next chunk
-            buffer = paginator.buffer;
-            const sliceEnd = Math.min(buffer.length, TOTAL);
-            const newItems = buffer.slice(questions.length, sliceEnd);
-            // preload new items
-            await Promise.all(
-              newItems.map((q) =>
-                q.image
-                  ? new Promise((r) => {
-                      const img = new Image();
-                      img.src = q.image;
-                      img.onload = img.onerror = r;
-                    })
-                  : Promise.resolve()
-              )
-            );
-            if (!mounted) break;
-            setQuestions(buffer.slice(0, sliceEnd));
-          }
-        })();
+        const pg = createPokePaginator(TOTAL_QUESTIONS, 3);
+        paginatorRef.current = pg;
+        await pg.init();
+        if (!active) return;
+        setQuestions(pg.buffer.slice(0, 3));
       } else {
         const all = await loadBigOQuestions();
-        const picked = shuffle(all).slice(0, TOTAL);
-        if (!mounted) return;
-        setQuestions(picked);
+        if (!active) return;
+        setQuestions(shuffle(all).slice(0, TOTAL_QUESTIONS));
       }
       setCurrentIndex(0);
       setScore(0);
       setSelected(null);
       setTimeLeft(15);
-    }
-    init();
-    return () => {
-      mounted = false;
-      clearInterval(timerRef.current);
     };
-  }, [categoryKey, isPokemon, shuffle]);
+    load();
+    return () => { active = false; clearInterval(timerRef.current); };
+  }, [categoryKey, isPokemon]);
 
-  // timer per question
+  // Prefetch on index change
+  useEffect(() => {
+    if (isPokemon && paginatorRef.current) {
+      const pg = paginatorRef.current;
+      pg.ensureBuffer(currentIndex);
+      setQuestions(pg.buffer.slice(0, TOTAL_QUESTIONS));
+    }
+  }, [currentIndex, isPokemon]);
+
+  // Timer per question
   useEffect(() => {
     if (!questions.length) return;
     clearInterval(timerRef.current);
@@ -144,43 +137,44 @@ export default function Quiz() {
     return () => clearInterval(timerRef.current);
   }, [questions, currentIndex]);
 
-  const handleAnswer = useCallback(
-    (idx) => {
-      clearInterval(timerRef.current);
-      setSelected(idx);
-      const q = questions[currentIndex];
-      const correct = idx === q.answerIndex;
-      if (correct) setScore((s) => s + 1);
-      setTimeout(() => {
-        const next = currentIndex + 1;
-        if (next < TOTAL && next < questions.length) {
-          setCurrentIndex(next);
-          setSelected(null);
-        } else {
-          navigate(`/result?score=${score + (correct ? 1 : 0)}`);
-        }
-      }, 600);
-    },
-    [currentIndex, questions, score, navigate]
-  );
+  // Handle answer
+  const handleAnswer = useCallback((idx) => {
+    clearInterval(timerRef.current);
+    setSelected(idx);
+    const correct = idx === questions[currentIndex]?.answerIndex;
+    if (correct) setScore((s) => s + 1);
+    setTimeout(() => {
+      const next = currentIndex + 1;
+      if (next < TOTAL_QUESTIONS) {
+        setCurrentIndex(next);
+        setSelected(null);
+      } else {
+        onComplete
+          ? onComplete({ score: correct ? score + 1 : score, total: TOTAL_QUESTIONS })
+          : navigate(`/result?score=${correct ? score + 1 : score}`);
+      }
+    }, 600);
+  }, [currentIndex, questions, score, onComplete, navigate]);
 
-  if (!questions.length)
-    return <div className="loading-screen">Loading Quiz...</div>;
+  if (!questions.length) return <div className="loading-screen">Loading Quiz...</div>;
 
-  const q = questions[currentIndex];
+  const currentQ = questions[currentIndex];
 
   return (
     <div className="quiz-container">
+      {isPokemon && (
+        <button className="mute-toggle" onClick={toggleMute}>
+          {muted ? "Unmute Theme" : "Mute Theme"}
+        </button>
+      )}
       <h2>{CATEGORIES.find((c) => c.key === categoryKey)?.label} Quiz</h2>
-      <div className="progress">
-        Question {currentIndex + 1} / {TOTAL}
-      </div>
+      <div className="progress">Question {currentIndex + 1} / {TOTAL_QUESTIONS}</div>
       <div className="timer">Time Left: {timeLeft}s</div>
       <QuestionDisplay
-        q={q}
+        question={currentQ}
         onAnswer={handleAnswer}
         selected={selected}
-        answerIndex={q.answerIndex}
+        answerIndex={currentQ.answerIndex}
       />
     </div>
   );
