@@ -9,7 +9,7 @@ import { CATEGORIES } from "../constants/categories";
 const TOTAL_QUESTIONS = 10;
 const POKEMON_CATEGORY = "pokemon";
 
-// Utility to shuffle arrays
+// Shuffle utility
 const shuffle = (arr) => {
   const a = [...arr];
   for (let i = a.length - 1; i > 0; i--) {
@@ -61,31 +61,34 @@ export default function Quiz({ onComplete }) {
   const timerRef = useRef(null);
   const paginatorRef = useRef(null);
   const themeAudioRef = useRef(null);
+  const hasInteractedRef = useRef(false);
 
   const isPokemon = categoryKey === POKEMON_CATEGORY;
 
   // Toggle mute state
-  const toggleMute = () => setMuted((m) => !m);
+  const toggleMute = () => {
+    setMuted((m) => !m);
+    if (themeAudioRef.current) {
+      themeAudioRef.current.muted = !themeAudioRef.current.muted;
+    }
+  };
 
-  // Play theme on mount
+  // Initialize theme audio on mount (preload only)
   useEffect(() => {
     if (!isPokemon) return;
     const audio = new Audio("/Trivio/pokemon-theme.mp3");
     audio.loop = true;
     audio.muted = muted;
+    audio.preload = "auto";
     audio.play().catch(() => {});
     themeAudioRef.current = audio;
     return () => {
       audio.pause();
+      themeAudioRef.current = null;
     };
   }, [isPokemon]);
 
-  // Sync mute state
-  useEffect(() => {
-    if (themeAudioRef.current) themeAudioRef.current.muted = muted;
-  }, [muted]);
-
-  // Initial load and basic chunk logic
+  // Load questions
   useEffect(() => {
     let active = true;
     const load = async () => {
@@ -109,11 +112,11 @@ export default function Quiz({ onComplete }) {
     return () => { active = false; clearInterval(timerRef.current); };
   }, [categoryKey, isPokemon]);
 
-  // Prefetch on index change
+  // Prefetch
   useEffect(() => {
     if (isPokemon && paginatorRef.current) {
       const pg = paginatorRef.current;
-      pg.ensureBuffer(currentIndex);
+      pg.ensureBuffer(currentIndex + 1);
       setQuestions(pg.buffer.slice(0, TOTAL_QUESTIONS));
     }
   }, [currentIndex, isPokemon]);
@@ -136,32 +139,47 @@ export default function Quiz({ onComplete }) {
     return () => clearInterval(timerRef.current);
   }, [questions, currentIndex]);
 
+  // Handle user interaction to start theme
+  const handleInteraction = () => {
+    if (isPokemon && themeAudioRef.current && !hasInteractedRef.current) {
+      themeAudioRef.current.muted = muted;
+      themeAudioRef.current.play().catch(() => {});
+      hasInteractedRef.current = true;
+    }
+  };
+
   // Handle answer
   const handleAnswer = useCallback((idx) => {
+    handleInteraction();
     clearInterval(timerRef.current);
     setSelected(idx);
     const correct = idx === questions[currentIndex]?.answerIndex;
     if (correct) setScore((s) => s + 1);
+
+    // Prefetch next
+    if (isPokemon && paginatorRef.current) paginatorRef.current.ensureBuffer(currentIndex + 1);
+
+    const FEEDBACK_DELAY = correct ? 400 : 800;
+
     setTimeout(() => {
       const next = currentIndex + 1;
-      if (next < TOTAL_QUESTIONS) {
+      if (next < TOTAL_QUESTIONS && next < questions.length) {
         setCurrentIndex(next);
         setSelected(null);
       } else {
-        onComplete
-          ? onComplete({ score: correct ? score + 1 : score, total: TOTAL_QUESTIONS })
-          : navigate(`/result?score=${correct ? score + 1 : score}`);
+        const finalScore = correct ? score + 1 : score;
+        if (onComplete) onComplete({ score: finalScore, total: TOTAL_QUESTIONS });
+        else navigate(`/result?score=${finalScore}`);
       }
-    }, 600);
-  }, [currentIndex, questions, score, onComplete, navigate]);
+    }, FEEDBACK_DELAY);
+  }, [currentIndex, questions, score, onComplete, navigate, isPokemon]);
 
   if (!questions.length) return <div className="loading-screen">Loading Quiz...</div>;
 
   const currentQ = questions[currentIndex];
 
   return (
-    <div className="quiz-container">
-      {/* Header with title and mute in top-right */}
+    <div className="quiz-container" onClick={handleInteraction}>
       <div className="quiz-header" style={{ position: 'relative' }}>
         <h2>{CATEGORIES.find((c) => c.key === categoryKey)?.label} Quiz</h2>
         {isPokemon && (
