@@ -8,22 +8,14 @@ export default function Result() {
   const score = params.get("score") || "0";
 
   const [copiedLink, setCopiedLink] = useState(false);
-  const [copiedScore, setCopiedScore] = useState(false);
 
   // Base URL without query params
-  const cleanUrl = `${window.location.origin}${window.location.pathname}`;
+  const cleanUrl = `${window.location.origin}/Trivio/`;
 
   const handleCopyLink = () => {
     navigator.clipboard.writeText(cleanUrl).then(() => {
       setCopiedLink(true);
       setTimeout(() => setCopiedLink(false), 2000);
-    });
-  };
-
-  const handleCopyScore = () => {
-    navigator.clipboard.writeText(`${score}/10`).then(() => {
-      setCopiedScore(true);
-      setTimeout(() => setCopiedScore(false), 2000);
     });
   };
 
@@ -36,18 +28,18 @@ export default function Result() {
       <h2>Quiz Complete!</h2>
       <p>Your Score: {score}/10</p>
       <div className="options">
-        <button className="btn" onClick={handleCopyLink}>
+        <button className="btn share-btn" onClick={handleCopyLink}>
           {copiedLink ? "Link Copied! ✓" : "Share Link"}
         </button>
         <a
-          className="btn"
+          className="btn share-btn"
           href={`https://x.com/intent/tweet?text=${shareText}`}
           target="_blank"
           rel="noopener noreferrer"
         >
           Share on X
         </a>
-        <Link className="btn" to="/">
+        <Link className="btn share-btn" to="/">
           Play Again
         </Link>
       </div>
