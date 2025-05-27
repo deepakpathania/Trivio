@@ -187,3 +187,10 @@ body {
   word-break: normal;           /* don’t break inside words */
   overflow-wrap: break-word;    /* wrap long words only at word boundaries */
 }
+
+.mute-toggle {
+  position: fixed;
+  top: 0;
+  right: 0.5em;
+  color: #0f0;
+}

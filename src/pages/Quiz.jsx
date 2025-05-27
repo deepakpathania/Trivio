@@ -19,7 +19,7 @@ const shuffle = (arr) => {
   return a;
 };
 
-// Component to display a question
+// Memoized question display
 const QuestionDisplay = memo(({ question, onAnswer, selected, answerIndex }) => (
   <div className="question-block">
     {question.question && <p className="question-text text-wrap">{question.question}</p>}
@@ -64,21 +64,20 @@ export default function Quiz({ onComplete }) {
 
   const isPokemon = categoryKey === POKEMON_CATEGORY;
 
-  // Mute control
+  // Toggle mute state
   const toggleMute = () => setMuted((m) => !m);
 
-  // Play theme audio on mount
+  // Play theme on mount
   useEffect(() => {
-    if (isPokemon) {
-      const audio = new Audio("/Trivio/pokemon-theme.mp3");
-      audio.loop = true;
-      audio.muted = muted;
-      audio.play().catch(() => {});
-      themeAudioRef.current = audio;
-      return () => {
-        audio.pause();
-      };
-    }
+    if (!isPokemon) return;
+    const audio = new Audio("/Trivio/pokemon-theme.mp3");
+    audio.loop = true;
+    audio.muted = muted;
+    audio.play().catch(() => {});
+    themeAudioRef.current = audio;
+    return () => {
+      audio.pause();
+    };
   }, [isPokemon]);
 
   // Sync mute state
@@ -162,12 +161,19 @@ export default function Quiz({ onComplete }) {
 
   return (
     <div className="quiz-container">
-      {isPokemon && (
-        <button className="mute-toggle" onClick={toggleMute}>
-          {muted ? "Unmute Theme" : "Mute Theme"}
-        </button>
-      )}
-      <h2>{CATEGORIES.find((c) => c.key === categoryKey)?.label} Quiz</h2>
+      {/* Header with title and mute in top-right */}
+      <div className="quiz-header" style={{ position: 'relative' }}>
+        <h2>{CATEGORIES.find((c) => c.key === categoryKey)?.label} Quiz</h2>
+        {isPokemon && (
+          <button
+            className="btn mute-toggle"
+            onClick={toggleMute}
+          >
+            {muted ? 'Unmute' : 'Mute'}
+          </button>
+        )}
+      </div>
+
       <div className="progress">Question {currentIndex + 1} / {TOTAL_QUESTIONS}</div>
       <div className="timer">Time Left: {timeLeft}s</div>
       <QuestionDisplay
