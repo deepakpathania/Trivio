@@ -194,3 +194,101 @@ body {
   right: 0.5em;
   color: #0f0;
 }
+
+.multiplayer-lobby {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  padding: 2rem;
+  max-width: 500px;
+  margin: 0 auto;
+}
+
+.lobby-title {
+  margin-bottom: 2rem;
+  font-size: 2rem;
+  text-align: center;
+}
+
+/* Each row spaced */
+.lobby-row {
+  width: 100%;
+  display: flex;
+  justify-content: center;
+  margin-bottom: 2rem;
+}
+
+/* Shared base for create & join buttons */
+.lobby-btn {
+  padding: 1rem;
+  font-size: 1rem;
+  text-decoration: none;
+  white-space: normal;
+  word-break: break-word;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  color: #0f0;
+  background: transparent;
+  border: 2px solid #0f0;
+  min-height: 3rem;
+  cursor: pointer;
+  transition: background-color 0.2s ease, color 0.2s ease;
+  width: 100%;
+  max-width: 300px;
+  box-sizing: border-box;
+}
+.lobby-button:hover {
+  background-color: #0f0;
+  color: #000;
+}
+.lobby-button:disabled {
+  opacity: 0.6;
+  cursor: not-allowed;
+}
+
+/* Apply to create */
+.create-btn {
+  /* inherits .lobby-button */
+}
+
+/* Join form */
+.join-form {
+  width: 100%;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+}
+
+/* Input matches button exactly */
+.join-input {
+  padding: 1rem;
+  font-size: 1rem;
+  white-space: normal;
+  word-break: break-word;
+  min-height: 3rem;
+  width: 100%;
+  max-width: 300px;
+  border: 2px solid #0f0;
+  background: transparent;
+  color: inherit;
+  box-sizing: border-box;
+  margin-bottom: 1rem;
+}
+
+/* Join button using same base */
+.join-btn {
+  /* reuse lobby-button styles */
+}
+
+/* On larger screens, side-by-side but equal widths */
+@media (min-width: 600px) {
+  .join-form {
+    flex-direction: row;
+    justify-content: center;
+  }
+  .join-input {
+    margin-bottom: 0;
+    margin-right: 1rem;
+  }
+}
