@@ -132,7 +132,7 @@ body {
 }
 
 /* Category list: responsive grid */
-.category-list {
+.category-list, .mode-select {
   display: grid;
   grid-template-columns: repeat(auto-fit, minmax(150px, 1fr));
   gap: 1rem;
@@ -142,7 +142,7 @@ body {
 }
 
 /* Category buttons */
-.category-btn, .share-btn {
+.category-btn, .share-btn, .mode-btn {
   padding: 1rem;
   font-size: 1rem;
   text-decoration: none;

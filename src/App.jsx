@@ -1,8 +1,12 @@
-import React from "react";
-import { BrowserRouter as Router, Routes, Route, Link } from "react-router-dom";
-import Quiz from "./pages/Quiz";
-import Result from "./pages/Result";
-import { CATEGORIES } from "./constants/categories";
+import React from "react"
+import { BrowserRouter as Router, Routes, Route, Link } from "react-router-dom"
+
+import ModeSelect from "./pages/ModeSelect.jsx"
+import CategoryList from "./pages/CategoryList.jsx"
+import Quiz from "./pages/Quiz.jsx"
+import Result from "./pages/Result.jsx"
+import MultiplayerLobby from "./pages/MultiplayerLobby.jsx"
+import MultiplayerQuiz from "./pages/MultiplayerQuiz.jsx"
 
 export default function App() {
   return (
@@ -10,29 +14,27 @@ export default function App() {
       <div className="app-container">
         <h1 className="app-title">Trivio</h1>
         <Routes>
-          <Route
-            path="/"
-            element={
-              <div className="category-list">
-                {CATEGORIES.map((cat) => (
-                  <Link
-                    key={cat.key}
-                    to={cat.enabled ? `/quiz/${cat.key}` : "#"}
-                    className={`btn category-btn text-wrap ${
-                      !cat.enabled ? "disabled" : ""
-                    }`}
-                    onClick={(e) => !cat.enabled && e.preventDefault()}
-                  >
-                    {cat.label}
-                  </Link>
-                ))}
-              </div>
-            }
-          />
-          <Route path="/quiz/:categoryKey" element={<Quiz />} />
+          {/* 1) Mode selection */}
+          <Route path="/" element={<ModeSelect />} />
+
+          {/* 2) Single‐player category list */}
+          <Route path="/single" element={<CategoryList />} />
+
+          {/* 3) Single‐player quiz & result */}
+          <Route path="/single/:categoryKey" element={<Quiz />} />
           <Route path="/result" element={<Result />} />
+
+          {/* 4) Multiplayer flow (to be implemented) */}
+          <Route path="/multiplayer" element={<MultiplayerLobby />} />
+          <Route
+            path="/multiplayer/:roomId/:playerId"
+            element={<MultiplayerQuiz />}
+          />
+
+          {/* Fallback */}
+          <Route path="*" element={<div>404 Not Found</div>} />
         </Routes>
       </div>
     </Router>
-  );
+  )
 }
